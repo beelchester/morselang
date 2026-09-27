@@ -4,16 +4,16 @@ use core::{fmt, panic};
 use std::iter::Peekable;
 
 #[derive(Debug)]
-pub enum Expression<'a> {
+pub enum TokenTree<'a> {
     Atom(Token<'a>),
-    Operation(Token<'a>, Vec<Expression<'a>>),
+    Cons(Token<'a>, Vec<TokenTree<'a>>),
 }
 
-impl<'a> fmt::Display for Expression<'a> {
+impl<'a> fmt::Display for TokenTree<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Expression::Atom(t) => write!(f, "{}", t),
-            Expression::Operation(head, expressions) => {
+            TokenTree::Atom(t) => write!(f, "{}", t),
+            TokenTree::Cons(head, expressions) => {
                 write!(f, "({}", head)?;
                 for s in expressions {
                     write!(f, " {}", s)?
@@ -45,12 +45,52 @@ impl<'a> Parser<'a> {
     pub fn new(lexer: Peekable<Lexer<'a>>) -> Self {
         Self { lexer }
     }
-    pub fn parse(&mut self) -> Expression<'a> {
-        self.parse_exp(0)
+    pub fn parse(&mut self) -> TokenTree<'a> {
+        self.parse_statement()
     }
-    fn parse_exp(&mut self, min_bp: u8) -> Expression<'a> {
+
+    fn parse_statement(&mut self) -> TokenTree<'a> {
+        let token = self.lexer.next().unwrap();
+        dbg!(&token);
+        match token {
+            Token::Set => {
+                let identifier = TokenTree::Atom(self.lexer.next().unwrap());
+                if !matches!(self.lexer.next().unwrap(), Token::Assign) {
+                    panic!("expected assign")
+                };
+                let rhs = self.parse_exp(0);
+                if !matches!(self.lexer.next().unwrap(), Token::Semi) {
+                    panic!("expected semicolan")
+                };
+                TokenTree::Cons(Token::Set, vec![identifier, rhs])
+            }
+            Token::Function => {
+                let identifier = TokenTree::Atom(self.lexer.next().unwrap());
+                if !matches!(self.lexer.next().unwrap(), Token::BOpen) {
+                    panic!("expected (")
+                };
+                if !matches!(self.lexer.next().unwrap(), Token::BClose) {
+                    panic!("expected )")
+                };
+                if !matches!(self.lexer.next().unwrap(), Token::CbOpen) {
+                    panic!("expected {{");
+                };
+
+                let block = self.parse_statement();
+
+                if !matches!(self.lexer.next().unwrap(), Token::CbClose) {
+                    panic!("expected }}");
+                };
+
+                TokenTree::Cons(Token::Function, vec![identifier, block])
+            }
+            t => todo!("{t}"),
+        }
+    }
+
+    fn parse_exp(&mut self, min_bp: u8) -> TokenTree<'a> {
         let mut lhs = match self.lexer.next().unwrap().into_kind() {
-            TokenKind::Atom(t) => Expression::Atom(t),
+            TokenKind::Atom(t) => TokenTree::Atom(t),
             TokenKind::Operator(Token::BOpen) => {
                 let lhs = self.parse_exp(0);
                 assert_eq!(self.lexer.next().unwrap(), Token::BClose);
@@ -65,10 +105,13 @@ impl<'a> Parser<'a> {
                     break;
                 }
 
-                TokenKind::Atom(Token::CbClose) => {
+                TokenKind::Atom(Token::BClose) => {
                     break;
                 }
                 TokenKind::Operator(_) => kind,
+                TokenKind::Atom(Token::Semi) => {
+                    break;
+                }
                 _ => panic!(),
             };
             let (lbp, rbp) = infix_binding_power(&op);
@@ -80,7 +123,7 @@ impl<'a> Parser<'a> {
             let TokenKind::Operator(operator) = op else {
                 unreachable!()
             };
-            lhs = Expression::Operation(operator, vec![lhs, rhs]);
+            lhs = TokenTree::Cons(operator, vec![lhs, rhs]);
         }
         lhs
     }

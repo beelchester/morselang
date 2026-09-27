@@ -56,8 +56,6 @@ impl<'a> Lexer<'a> {
             b';' => Token::Semi,
             b',' => Token::Comma,
             //TODO: temp; change to morse equivalent
-            b't' => Token::Bool(true),
-            b'f' => Token::Bool(false),
             b'S' => Token::Set,
             b'I' => Token::If,
             b'E' => Token::Else,

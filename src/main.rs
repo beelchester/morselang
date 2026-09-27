@@ -1,4 +1,4 @@
-use morselang::{lexer::Lexer, parser::Parser};
+use morselang::{lexer::Lexer, parser::Parser, tokens::Token};
 
 fn main() {
     // let src = r#"
@@ -15,13 +15,18 @@ fn main() {
     // set x = 42
     // ..-.--.
     // "#;
-    let src = "a = 3 + 5 * 10";
-    let lexer = Lexer::new(src).peekable();
+    let src = r#"
+    F foo() {
+    S a = 3 + 5 * 10;
+    }
+    "#;
+    let mut lexer = Lexer::new(src).peekable();
 
     // while let Some(tok) = lexer.next() {
-    //     // if let Some(tok) = lexer.peek() {
+    //     if matches!(tok, Token::Eof) {
+    //         break;
+    //     }
     //     dbg!(tok);
-    //     // }
     // }
     let exp = Parser::new(lexer).parse();
     dbg!(&exp);
