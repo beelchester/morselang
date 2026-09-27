@@ -1,4 +1,6 @@
-#[derive(Debug, Clone)]
+use std::fmt;
+
+#[derive(Debug, Clone, PartialEq, Copy)]
 pub enum Token<'a> {
     Ident(&'a str),
     Number(i64),
@@ -22,12 +24,74 @@ pub enum Token<'a> {
     CbClose,
     Semi,
     Comma,
+    Bool(bool),
+    Eof,
 }
 
+impl<'a> fmt::Display for Token<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Token::Ident(s) => write!(f, "Ident({s})"),
+            Token::Number(n) => write!(f, "Number({n})"),
+            Token::String(s) => write!(f, "String({s:?})"),
+            Token::Gt => write!(f, ">"),
+            Token::Lt => write!(f, "<"),
+            Token::Eq => write!(f, "=="),
+            Token::Assign => write!(f, "="),
+            Token::Plus => write!(f, "+"),
+            Token::Star => write!(f, "*"),
+            Token::Minus => write!(f, "-"),
+            Token::Slash => write!(f, "/"),
+            Token::Set => write!(f, "set"),
+            Token::If => write!(f, "if"),
+            Token::Else => write!(f, "else"),
+            Token::Loop => write!(f, "loop"),
+            Token::Function => write!(f, "fn"),
+            Token::BOpen => write!(f, "("),
+            Token::BClose => write!(f, ")"),
+            Token::CbOpen => write!(f, "{{"),
+            Token::CbClose => write!(f, "}}"),
+            Token::Semi => write!(f, ";"),
+            Token::Comma => write!(f, ","),
+            Token::Bool(b) => write!(f, "{b}"),
+            Token::Eof => write!(f, "<EOF>"),
+        }
+    }
+}
+
+pub enum TokenKind<'a> {
+    Atom(Token<'a>),
+    Operator(Token<'a>),
+}
+
+impl<'a> Token<'a> {
+    pub fn into_kind(self) -> TokenKind<'a> {
+        match self {
+            Token::Gt
+            | Token::Lt
+            | Token::Eq
+            | Token::Assign
+            | Token::Plus
+            | Token::Star
+            | Token::Minus
+            | Token::Slash => TokenKind::Operator(self),
+
+            _ => TokenKind::Atom(self),
+        }
+    }
+}
 pub struct Lexer<'a> {
     src: &'a str,
     bytes: &'a [u8],
     cursor: usize,
+}
+
+impl<'a> Iterator for Lexer<'a> {
+    type Item = Token<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        Some(self.next_token())
+    }
 }
 
 impl<'a> Lexer<'a> {
@@ -39,17 +103,19 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    pub fn peek(&self) -> Option<u8> {
+    fn peek(&self) -> Option<u8> {
         self.bytes.get(self.cursor).copied()
     }
 
-    pub fn next_token(&mut self) -> Option<Token<'a>> {
+    fn next_token(&mut self) -> Token<'a> {
         // whitespace skipper
         while matches!(self.peek(), Some(c) if c.is_ascii_whitespace()) {
             self.cursor += 1;
         }
         let start = self.cursor;
-        let current = self.peek()?;
+        let Some(current) = self.peek() else {
+            return Token::Eof;
+        };
         self.cursor += 1;
 
         // dbg!(str::from_utf8(&[current]));
@@ -69,6 +135,14 @@ impl<'a> Lexer<'a> {
             b'}' => Token::CbClose,
             b';' => Token::Semi,
             b',' => Token::Comma,
+            //TODO: temp; change to morse equivalent
+            b't' => Token::Bool(true),
+            b'f' => Token::Bool(false),
+            b'S' => Token::Set,
+            b'I' => Token::If,
+            b'E' => Token::Else,
+            b'L' => Token::Loop,
+            b'F' => Token::Function,
             b'=' => {
                 if self.peek() == Some(b'=') {
                     self.cursor += 1;
@@ -123,7 +197,7 @@ impl<'a> Lexer<'a> {
             _ => unreachable!(),
         };
 
-        Some(token)
+        token
     }
 }
 
