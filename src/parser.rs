@@ -1,4 +1,5 @@
-use crate::lexer::{Lexer, Token, TokenKind};
+use crate::lexer::Lexer;
+use crate::tokens::{Token, TokenKind};
 use core::{fmt, panic};
 use std::iter::Peekable;
 
